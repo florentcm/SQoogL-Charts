@@ -1,23 +1,29 @@
 DESCRIPTION
 
-SQoogL Charts creates a google chart from a SQL source on Drupal. It generates javascript calling Google Charts Tools (http://code.google.com/intl/en-EN/apis/chart/).
+SQoogL Charts is a simple and lightweight module that creates a Google chart from a SQL source. Insert a MySQL query into a node and it will generate a chart by calling the Google Charts Tools. (http://code.google.com/intl/en-EN/apis/chart/).
 
-We are currently developping this module. There isn't any GUI yet. It acts like a PHP function that you can call from all content types.
+We are currently developing this module. There isn't any GUI yet. You just insert a PHP function that can be called from any content type.
 
-The project was born due to limitations of Views. Indeed, we wanted to be able to contruct a chart with a SQL query as source. Instead of modify views, we prefered using google charts and create a simple and lightweight module.
+The project was born due to limitations of Views particularly due to the fact that it was impossible to make calculations AND generate a graph.
+
 
 REQUIREMENTS
+Activate PHP filter module from core. It allows PHP code to be evaluated within a node.
+This module has been tested only on Drupal 7.7 but should work on any Drupal 7 versions. Let us know if it doesn’t!
 
-This module requires that you can write PHP inside contents on drupal. So you have to activate the module called PHP filter. It allows PHP code to be evaluated within the content.
-This module has been tested only Drupal 7.7. But there is no reason for this module not to run in other drupal versions.
 
 HOW IT WORKS
 
-Once the module is active in drupal, you can call the following function to draw a chart :
+Activate the module and edit “sqoogl.config.php” in drupal/sites/all/modules/sqoogl_charts.
+- SQOOGLE_HOST is the host address of your sql database, generally localhost.
+- SQOOGLE_USER is the MySQL user you want to use. If you want to use your Drupal tables with this module, it is safer to create a new mySQL user with less privileges.
+- SQOOGLE_PASSWORD is the password associated with the user.
+- SQOOGLE_DATABASE is the name of the MySQL database you want to use.
 
-function sqoogl($query, $type='pie', $table=true, $x=false, $ctitle=false, $width=600, $height=400, $filters=false, $dependants=false, $html_table=false)
+Once this parameter file is complete, you can call the following functions inside a node to draw a chart :
 
-- string $query is the query string written in SQL Language. Every select item must be followed by AS alias where alias is the alias name of the column. The first column is column number 0. I's important for other variables.
+- function sqoogl($query, $type, $table, $x, $ctitle, $width, $height, $filters, $dependants, $html_table)
+string $query is the query string written in SQL Language. Every select item must be followed by AS alias where alias is the alias name of the column. The first column is column number 0. It's important for other variables. You have to avoid NULL values in your query. 
 
 - string $type is the google graph type. For now you can choose pie (for pie chart), or table(for table).
 
@@ -33,45 +39,50 @@ function sqoogl($query, $type='pie', $table=true, $x=false, $ctitle=false, $widt
 
 - string $filters is a list of columns where you want to be able to filter with. There is two kinds : NumberRangeFilter and StringFilter, but the function choose the good filter for you. If you want to be able to filter with column 3 and 5, simply set $filter with the value '3,5'. If you don't want filters, set the value to false.
 
-- string $dependants allow you to set dependancies between filters. Important : the column numbers set in dependancies have to be in filters, otherwise you'll have an error. If you want that filter of column " (town) be dependant of the filter of column 5 (country), then simply set the value of dependant to '5-3'. If you need other dependancies, then separate them with a comma ('5-3,3,2'). If you don't need dependancies, set the value to false.
+- string $dependants allow you to set dependencies between filters. Important : the column numbers set in dependencies have to be in filters, otherwise you'll have an error. If you want that filter of column " (town) be dependant of the filter of column 5 (country), then simply set the value of dependant to '5-3'. If you need other dependencies, then separate them with a comma ('5-3,3,2'). If you don't need dependencies, set the value to false.
 
-- boolean html_table allow you to display the data of your SQL query in a HTML table. This is default to false, but you can set it to true if you want to debug your SQL query or check the avaibility of Google Charts API.
+- boolean $html_table allow you to display the data of your SQL query in a HTML table. This is default to false, but you can set it to true if you want to debug your SQL query or check the availability of Google Charts API.
+
+About date values : We wanted to be able to filter with dates values. Since Google Chart API doesn’t provide any date format filter, we decided to transform the unix timestamp to an integer as soon as the column alias contain ‘date’. The integer is built as follows : YEARMONTHDAY.HOURMINUTE. Example with october 5th 2011 3:10pm => 20111005.1510.
+
 
 RECOMMENDATIONS
 
-We recommand you to create a new content type ready for SQoogL Charts.
-In this way, you could add some default text to your custom content in order to have only to replace the some values to have a beautiful google graph.
+We recommend you create a new content type ready for SQoogL Charts.
+This way, you could add some default text to your custom content in order to have only to replace some values to have a beautiful google graph.
+In order to avoid NULL values in your query, we recommend you to use the mySQL function IFNULL(column, ‘Value_if_null’).
+
 
 EXAMPLE 
 
+Once you’re module is installed and configured with a drupal mySQL source(not mandatory, but we used it for the example), insert this code in a new content to test it :
+
+<?php
 $query = "
 
-SELECT sql_column0 AS column0, sql_column1 AS column1, sql_column2 AS column 2
+SELECT n.nid AS nid, IFNULL(n.title,'title') AS title, IFNULL(n.created,0) AS date
 FROM
-sql_table
-GROUP BY column1
-ORDER BY column0 DESC
-LIMIT 1000
+node n
+ORDER BY date DESC
+LIMIT 10
 
 ";
 
-$type='pie';
+$type='table';
 
 $table = true;
 
-$x = '1,3';
+$x = '1,2';
 
-$ctitle = false;
+$ctitle = 'Ten last nodes';
 
 $width = 600;
 $height= 400;
 
-$filters = '2,3';
+$filters = '1,2';
 
-$dependants = '3-2';
+$dependants = false;
 
 sqoogl($query, $type, $table, $x, $ctitle, $width, $height, $filters, $dependants);
 
-
-
-
+?>
