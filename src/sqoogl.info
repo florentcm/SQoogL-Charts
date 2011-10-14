@@ -1,0 +1,5 @@
+name = SQoogL Charts	
+description = Provide library to help construct Google Charts from mySQL source.
+core = 7.x
+
+version = "7.x-X.X"

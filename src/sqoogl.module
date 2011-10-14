@@ -1,0 +1,287 @@
+<?php
+
+/**
+ * Provide library to help construct Google Charts from mySQL source
+ * Draw a chart inside a content using PHP(Drupal), Javascript(Google Charts), and HTML(Table)
+ * @link http://code.google.com/intl/en-EN/apis/chart/
+ * @author : Florent Cima <florentcm@gmail.com>
+ */
+
+include_once('sqoogl.config.php');
+
+function sqoogl($query, $type='pie', $table=TRUE, $x=FALSE, $ctitle=FALSE, $width=600, $height=400, $filters=FALSE, $dependants=FALSE, $html_table=FALSE) {
+  if (trim($query) == ''):
+    echo 'SQL Query is empty!';
+    return;
+  elseif ($width < 10 OR $width > 2000 OR $height < 10 or $height > 2000):
+    echo 'Check the dimensions of your chart !';
+    return;
+  endif;
+// Connect to mysql
+  $con = mysql_connect(SQOOGLE_HOST, SQOOGLE_USER, SQOOGLE_PASSWORD);
+  mysql_select_db(SQOOGLE_DATABASE, $con);
+// Retrieve data from MYSQL Table
+  if ($con) {
+    mysql_query("SET NAMES 'utf8'");
+    $result = mysql_query($query);}
+  else{
+    echo "Mysql can't connect !";
+    return;
+  }
+// Test if there is data or not, and end if not
+  if ($result) {
+    $rows = mysql_num_rows($result);
+  }
+  else{
+    $rows = 0;
+    echo '0 line';
+    return;
+  }
+  if ($rows == 1) {
+    echo '1 line';}
+  else{
+    echo $rows . ' lines';
+  }
+  $fields = mysql_num_fields($result);
+// Retrieve type of data per column
+  for ($i=0;$i<$fields;$i++) {
+    $field_type[$i] = mysql_field_type($result, $i);
+  }
+  // Retrieve titles from query
+  preg_match_all('/as (\w*)/i', $query, $titles);
+    $options = FALSE;
+  // Correct the $type
+  switch (drupal_strtolower($type)) {
+    case 'table' :
+      $type = 'Table';
+      $x = FALSE;
+      break;
+    case 'pie' :
+      $type = 'PieChart';
+      $options = "'width': " . $width . ", 'height': " . $height . ", 'legend': 'bottom', 'pieSliceText': 'label'";
+      break;
+    case 'piechart' :
+      $type = 'PieChart';
+      break;
+    case 'bar' :
+      $type = 'BarChart';
+      break;
+    case 'line' :
+      $type = 'LineChart';
+      break;
+    case 'scatter' :
+      $type = 'ScatterChart';
+      break;
+    case 'column' :
+      $type = 'ColumnChart';
+      break;
+    case 'area' :
+      $type = 'AreaChart';
+      break;
+    case 'combo' :
+      $type = 'ComboChart';
+      break;
+    case 'candlestick';
+      $type = 'CandlestrickChart';
+      break;
+    case 'gauge' :
+      $type = 'Gauge';
+      break;
+    case 'geo' :
+      $type = 'GeoChart';
+      break;
+    case 'treemap' :
+      $type = 'TreeMap';
+      break;
+    default :
+      $type = 'Table';
+      break;
+  }
+ // Explode Filters
+  if ($filters) {
+  $filters = explode(",", $filters);
+  }
+// Explode Dependants
+  if ($dependants) {
+    $dependants = explode(',', $dependants);
+    foreach ($dependants as $depds) {
+      if (!in_array($depds[0], $filters) OR !in_array($depds[2], $filters)) {
+        echo 'Certaines dépendances de filtres ($dependants) ne sont pas contenues dans la variable $filters.';
+        return;
+      }
+    }
+  }
+// Construct HTML Page
+  echo '<html>';
+  echo '<head>';
+// Call the Google Charts API
+  echo '<script type="text/javascript" src="https://www.google.com/jsapi"></script>';
+  echo '<script type="text/javascript">';
+//$package = 'controls';
+  echo "google.load('visualization', '1.1', {'packages':['controls']});";
+// Callback that creates and populates a data table, instantiates the chart, passes in the data and draws it.
+  echo 'function drawVisualization() {';
+// Create the data table.
+  echo 'var data = new google.visualization.DataTable();';
+// Initialisation
+  $i=0; // Row count
+  $j=0; // Column count
+  $ctrln = 0; // Filter count
+  while ($record = mysql_fetch_array($result)) {
+    echo 'data.addRow();'; // Add new line for each record
+    $j = 0;
+    foreach ($titles[1] as $title) {
+  // Formatage des dates
+      if (stripos($title, 'date') !== FALSE AND is_numeric($record[$title])) {
+        if ($filters AND in_array($j, $filters)) {
+          $record[$title] = date( 'Ymd.His', $record[$title]); }
+        else{
+          $record[$title] = date( 'Y-m-d H:i:s', $record[$title]);
+          $field_type[$j] = 'string';
+        }
+      }
+      if ($i==0) { // Add the columns the first time (only when $i = 0)
+        if ($field_type[$j] === "int" OR $field_type[$j] === "real") {
+        // Number format if value of first record for this column is numeric
+          echo 'data.addColumn(\'number\',\'' . drupal_strtoupper($title) . '\');';
+       // Add Filter for this column if $j is in array $filters.
+          if ($filters) {
+            if (in_array($j, $filters)) {
+              echo "var ctrl" . $ctrln . "= new google.visualization.ControlWrapper({'controlType': 'NumberRangeFilter','containerId': 'ctrl" . $ctrln . "','options': {'filterColumnLabel': '" . drupal_strtoupper($title) . "'}});";
+              $ctrln++;
+            }
+          }
+        }
+        else{
+        // String format if it's not
+          echo 'data.addColumn(\'string\',\'' . drupal_strtoupper($title) . '\');';
+        // Add Filter for this column if $j is in array $filters.
+          if ($filters) {
+            if (in_array($j, $filters)) {
+              echo "var ctrl" . $ctrln . "= new google.visualization.ControlWrapper({'controlType': 'CategoryFilter','containerId': 'ctrl" . $ctrln . "','options': {'filterColumnLabel': '" . drupal_strtoupper($title) . "'}});";
+              $ctrln++;
+            }
+          }
+        }
+      }
+    // Add data from records
+      $array[$i][$title] = addslashes($record[$title]);
+      if ($field_type[$j] === "int" OR $field_type[$j] === "real") {
+      // Ajout de la cellule du tableau lorsque la valeur est numérique
+        echo 'data.setCell(' . $i . ', ' . $j . ', ' . $record[$title] . ');'; }
+      else{
+      // Ajout de la cellule du tableau avec valeur encadrée de guillemets lorsque celle-ci n'est pas numérique
+        echo 'data.setCell(' . $i . ', ' . $j . ', \'' . addslashes($record[$title]) . '\');';
+      }
+      $j++; // Increment column count
+    }
+    $i++;// Increment row count
+  }
+// Call the good chart to draw
+  echo "var " . $type . " = new google.visualization.ChartWrapper({'chartType': '" . $type . "','containerId': 'chart'";
+  if ($options) {
+    echo ",'options': {" . $options . "}";
+  }
+  if ($x) {
+    echo ", 'view': {'columns': [" . $x . "] }";
+  }
+  echo "});";
+  if ($type != 'table' && $table == TRUE) {
+    echo "var table = new google.visualization.ChartWrapper({'chartType': 'Table','containerId': 'table','options': {'width': " . $width . "}});";
+  }
+  // Create the dashboard.
+  if ($ctrln == 0) {
+    echo "var ctrl0 = new google.visualization.ControlWrapper({'controlType': 'CategoryFilter','containerId': 'ctrl0','options': {'filterColumnLabel': '" . drupal_strtoupper($titles[1][0]) . "'}});";
+    echo "var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard')).bind(ctrl0,";
+  }
+  elseif ($ctrln > 0) {
+    echo "var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard'))";
+    if ($dependants) {
+      foreach ($dependants as $depds) {
+        $depds[0] = array_search($depds[0], $filters);
+        $depds[2] = array_search($depds[2], $filters);
+        echo ".bind(ctrl" . $depds[0] . ",ctrl" . $depds[2] . ")";
+        $excepts[] = $depds[0];
+      }
+    }
+    echo ".bind([";
+    for ($i=0;$i<$ctrln;$i++) {
+      if (!isset($excepts) OR (isset($excepts) AND !in_array($i, $excepts))) {
+        if ($i==0) {
+          echo 'ctrl' . $i;
+        }
+        else {
+          echo ',ctrl' . $i;
+        }
+      }
+    }
+    echo '],';
+  }
+  if ($type != 'Table' && $table == TRUE) {
+    echo '[' . $type . ', table] )';
+  }
+  else{
+    echo $type . ' )';
+  }
+  echo ".draw(data)";
+  echo '}';
+// Set a callback to run when the Google Visualization API is loaded.
+  echo 'google.setOnLoadCallback(drawVisualization)';
+  echo '</script>';
+  echo '</head>';
+  echo '<body>';
+// Div that will hold the pie chart
+  echo '<div id="dashboard">';
+//Table with Filters
+  if ($ctrln > 0) {
+    echo '<table>';
+    echo '<tr><th colspan="2">Filtres</th></tr>';
+    for ($i=0;$i<$ctrln;$i++) {
+      if ($i % 2 == 0) {
+        echo '<tr><td><div id="ctrl' . $i . '"></div></td>';
+      }
+      else{
+        echo '<td><div id="ctrl' . $i . '"></div></td></tr>';
+      }
+    }
+    if ($i % 2 != 0) {
+      echo '</tr>';
+    }
+    echo '</table>';
+  }
+  else{
+    echo '<div width="0" height="0" style="display:none" id="ctrl0"></div>';
+  }
+  echo '<div id="chart"></div>';
+  echo '<div id="table"></div>';
+  echo '</div>';
+// $html_table = TRUE;
+// Construct the HTML table
+  if ($html_table == 'TRUE') {
+//Dashboard for filters
+  echo '<table id="html_tab">';
+  echo '<thead>';
+  echo '<tr>';
+// Construct HTML titles for table
+  foreach ($titles[1] as $title) {
+    echo '<th>' . drupal_strtoupper($title) . '</th>';
+  }
+  echo '</tr>';
+  echo '</thead>';
+  echo '<tbody>';
+// Construct all the HTML rows of table
+  foreach ($array as $row) {
+    echo '<tr>';
+    foreach ($row as $element) {
+      echo '<td>' . $element . '</td>';
+    }
+    echo '</tr>';
+  }
+  echo '</tbody>';
+  echo '</table>';
+  }
+// End of the page
+  echo '</body>';
+  echo '</html>';
+  }
+//don't close with ?>

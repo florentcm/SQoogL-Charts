@@ -1,0 +1,77 @@
+DESCRIPTION
+
+SQoogL Charts creates a google chart from a SQL source on Drupal. It generates javascript calling Google Charts Tools (http://code.google.com/intl/en-EN/apis/chart/).
+
+We are currently developping this module. There isn't any GUI yet. It acts like a PHP function that you can call from all content types.
+
+The project was born due to limitations of Views. Indeed, we wanted to be able to contruct a chart with a SQL query as source. Instead of modify views, we prefered using google charts and create a simple and lightweight module.
+
+REQUIREMENTS
+
+This module requires that you can write PHP inside contents on drupal. So you have to activate the module called PHP filter. It allows PHP code to be evaluated within the content.
+This module has been tested only Drupal 7.7. But there is no reason for this module not to run in other drupal versions.
+
+HOW IT WORKS
+
+Once the module is active in drupal, you can call the following function to draw a chart :
+
+function sqoogl($query, $type='pie', $table=true, $x=false, $ctitle=false, $width=600, $height=400, $filters=false, $dependants=false, $html_table=false)
+
+- string $query is the query string written in SQL Language. Every select item must be followed by AS alias where alias is the alias name of the column. The first column is column number 0. I's important for other variables.
+
+- string $type is the google graph type. For now you can choose pie (for pie chart), or table(for table).
+
+- boolean $table  (true/false), if $table is true and $type is different form table, it displays a table under the graph.
+
+- string $x represents the abscissa and ordinate of the graph, it contains the number of the columns. example : if $x = "0,3", then the graph will display the first column based on the fourth.
+
+- string $ctitle contains a title for the graph. It's not useful if you're using the same title as your content. If you don't want a title, set it to false.
+
+- integer $width is the width of the graph if it's not a table (table fits automatically to the columns). Default is 600.
+
+- integer $height is the height of the graph if it's not a table (table fits automatically to the rows). Default is 400.
+
+- string $filters is a list of columns where you want to be able to filter with. There is two kinds : NumberRangeFilter and StringFilter, but the function choose the good filter for you. If you want to be able to filter with column 3 and 5, simply set $filter with the value '3,5'. If you don't want filters, set the value to false.
+
+- string $dependants allow you to set dependancies between filters. Important : the column numbers set in dependancies have to be in filters, otherwise you'll have an error. If you want that filter of column " (town) be dependant of the filter of column 5 (country), then simply set the value of dependant to '5-3'. If you need other dependancies, then separate them with a comma ('5-3,3,2'). If you don't need dependancies, set the value to false.
+
+- boolean html_table allow you to display the data of your SQL query in a HTML table. This is default to false, but you can set it to true if you want to debug your SQL query or check the avaibility of Google Charts API.
+
+RECOMMENDATIONS
+
+We recommand you to create a new content type ready for SQoogL Charts.
+In this way, you could add some default text to your custom content in order to have only to replace the some values to have a beautiful google graph.
+
+EXAMPLE 
+
+$query = "
+
+SELECT sql_column0 AS column0, sql_column1 AS column1, sql_column2 AS column 2
+FROM
+sql_table
+GROUP BY column1
+ORDER BY column0 DESC
+LIMIT 1000
+
+";
+
+$type='pie';
+
+$table = true;
+
+$x = '1,3';
+
+$ctitle = false;
+
+$width = 600;
+$height= 400;
+
+$filters = '2,3';
+
+$dependants = '3-2';
+
+sqoogl($query, $type, $table, $x, $ctitle, $width, $height, $filters, $dependants);
+
+
+
+
